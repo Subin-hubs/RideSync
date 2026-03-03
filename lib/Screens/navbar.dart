@@ -10,16 +10,16 @@ import 'Profile_Page/profile_page.dart';
 
 
 
-class Mainpage extends StatefulWidget {
+class NavbarSide extends StatefulWidget {
   final int currentIndex;
 
-  const Mainpage(this.currentIndex, {Key? key}) : super(key: key);
+  const NavbarSide(this.currentIndex, {Key? key}) : super(key: key);
 
   @override
-  State<Mainpage> createState() => _MainpageState();
+  State<NavbarSide> createState() => _NavbarSideState();
 }
 
-class _MainpageState extends State<Mainpage> {
+class _NavbarSideState extends State<NavbarSide> {
   late PersistentTabController _controller;
 
   final List<Widget> _pages = const [
