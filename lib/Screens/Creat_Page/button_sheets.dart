@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:ride_sync/Screens/Creat_Page/create_page.dart';
+
+import 'joined_page.dart';
 
 /// Professional Button-style Bottom Sheet
 void showProfessionalBottomSheet(BuildContext context) {
@@ -59,8 +62,7 @@ void showProfessionalBottomSheet(BuildContext context) {
                 minimumSize: const Size.fromHeight(55), // full width
               ),
               onPressed: () {
-                Navigator.pop(context);
-                // Add create group logic here
+                Navigator.push(context, MaterialPageRoute(builder: (context)=>CreatePage()));
               },
             ),
             const SizedBox(height: 15),
@@ -87,8 +89,7 @@ void showProfessionalBottomSheet(BuildContext context) {
                 minimumSize: const Size.fromHeight(55),
               ),
               onPressed: () {
-                Navigator.pop(context);
-                // Add join group logic here
+                Navigator.push(context, MaterialPageRoute(builder: (context)=>JoinedPage()));
               },
             ),
             const SizedBox(height: 20),

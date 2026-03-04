@@ -22,7 +22,7 @@ class NavbarSide extends StatefulWidget {
 class _NavbarSideState extends State<NavbarSide> {
   late PersistentTabController _controller;
 
-  final List<Widget> _pages = const [
+  final List<Widget> _pages =  [
     HomePage(),
     ChatPage(),
     CreatePage(),
@@ -60,9 +60,9 @@ class _NavbarSideState extends State<NavbarSide> {
         activeColorPrimary: Colors.blueAccent,
         inactiveColorPrimary: Colors.blueAccent,
         iconSize: 35,
-        onPressed: (ctx){
-          showProfessionalBottomSheet(ctx!);
-        }
+          onPressed: (context) {
+            showProfessionalBottomSheet(this.context);
+          }
       ),
       PersistentBottomNavBarItem(
         icon: const Icon(Icons.notifications_none),
