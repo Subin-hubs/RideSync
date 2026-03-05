@@ -59,7 +59,14 @@ class _CreatePageState extends State<CreatePage> {
       "groupName": groupNameController.text.trim(),
       "joinCode": joinCode,
       "createdBy": userUid,
+      "member_count": 1, // Creator is first member
       "createdAt": FieldValue.serverTimestamp(),
+    });
+
+    // Add creator to joined_users subcollection
+    await groupRef.collection("joined_users").doc(userUid).set({
+      "uid": userUid,
+      "joined_at": FieldValue.serverTimestamp(),
     });
 
     // Save group under user's created groups
@@ -72,6 +79,7 @@ class _CreatePageState extends State<CreatePage> {
       "groupId": groupRef.id,
       "groupName": groupNameController.text.trim(),
       "joinCode": joinCode,
+      "member_count": 1, // Creator is first member
       "createdAt": FieldValue.serverTimestamp(),
     });
 

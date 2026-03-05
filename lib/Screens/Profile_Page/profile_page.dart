@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'edit_profile.dart';
+
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
@@ -16,47 +18,24 @@ class _ProfilePageState extends State<ProfilePage>
   final _auth = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
 
-  // ── Data ───────────────────────────────────────────────────────────────
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
   bool _isDark = false;
 
-  // Stats — will be populated from rides collection when it exists
-  // For now: all 0. Just add rides to Firestore and these will auto-populate.
-  int _totalRides = 0;
-  double _totalKm = 0.0;
-  double _totalHours = 0.0;
+  int _createdGroups = 0;
+  int _joinedGroups = 0;
 
-  // ── Animation ──────────────────────────────────────────────────────────
   late AnimationController _animCtrl;
   late Animation<double> _fade;
   late Animation<Offset> _slide;
 
-  // ── Theme tokens ───────────────────────────────────────────────────────
-  Color get _bg =>
-      _isDark ? const Color(0xFF0D0D12) : const Color(0xFFF4F4F6);
-  Color get _surface =>
-      _isDark ? const Color(0xFF16161F) : Colors.white;
-  Color get _border =>
-      _isDark ? const Color(0xFF252535) : const Color(0xFFE4E4E8);
-  Color get _primary =>
-      _isDark ? Colors.white : const Color(0xFF111111);
-  Color get _secondary =>
-      _isDark ? const Color(0xFF7A7A90) : const Color(0xFF8A8A8E);
-  Color get _dividerColor =>
-      _isDark ? const Color(0xFF252535) : const Color(0xFFEEEEF0);
-
-  // Accent: neon lime in dark, pitch black in light
-  Color get _accent =>
-      _isDark ? const Color(0xFFCBFF3F) : const Color(0xFF111111);
-  Color get _accentFg => _isDark ? const Color(0xFF0D0D12) : Colors.white;
-  Color get _accentSubtle =>
-      _isDark ? const Color(0xFFCBFF3F).withOpacity(0.12) : const Color(0xFF111111).withOpacity(0.08);
-
-  Color get _iconBg =>
-      _isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF0F0F3);
-  Color get _chevronColor =>
-      _isDark ? const Color(0xFF353548) : const Color(0xFFD1D1D8);
+  Color get _bg => _isDark ? const Color(0xFF0D0D12) : const Color(0xFFF4F6FB);
+  Color get _surface => _isDark ? const Color(0xFF16161F) : Colors.white;
+  Color get _border => _isDark ? const Color(0xFF252535) : const Color(0xFFEAECF0);
+  Color get _primary => _isDark ? const Color(0xFFF0F0F0) : const Color(0xFF1A1D23);
+  Color get _secondary => _isDark ? const Color(0xFF7A7A90) : const Color(0xFF94A3B8);
+  Color get _accent => _isDark ? const Color(0xFFCBFF3F) : const Color(0xFF6C63FF);
+  Color get _accentSubtle => _accent.withOpacity(_isDark ? 0.12 : 0.1);
 
   @override
   void initState() {
@@ -64,7 +43,7 @@ class _ProfilePageState extends State<ProfilePage>
     _animCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 700));
     _fade = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
-    _slide = Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
+    _slide = Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero)
         .animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut));
     _loadData();
   }
@@ -75,42 +54,34 @@ class _ProfilePageState extends State<ProfilePage>
     super.dispose();
   }
 
-  // ── Firestore fetch ────────────────────────────────────────────────────
   Future<void> _loadData() async {
     try {
       final user = _auth.currentUser;
       if (user == null) return;
 
-      // Load user profile from users/{uid}
+      // User profile
       final doc = await _firestore.collection('users').doc(user.uid).get();
-      if (doc.exists && mounted) {
-        setState(() => _userData = doc.data());
-      }
+      if (doc.exists && mounted) setState(() => _userData = doc.data());
 
-      // Load rides — collection: 'rides', documents with field uid == user.uid
-      // Fields expected per doc: distance_km (number), duration_hours (number)
-      // This returns 0s until you create the rides collection — no errors thrown.
-      try {
-        final ridesSnap = await _firestore
-            .collection('rides')
-            .where('uid', isEqualTo: user.uid)
-            .get();
+      // Created groups count
+      final createdSnap = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('created_groups')
+          .get();
 
-        double km = 0;
-        double hrs = 0;
-        for (final d in ridesSnap.docs) {
-          km += (d['distance_km'] as num? ?? 0).toDouble();
-          hrs += (d['duration_hours'] as num? ?? 0).toDouble();
-        }
-        if (mounted) {
-          setState(() {
-            _totalRides = ridesSnap.docs.length;
-            _totalKm = km;
-            _totalHours = hrs;
-          });
-        }
-      } catch (_) {
-        // rides collection doesn't exist yet — stays 0, no crash
+      // Joined groups count
+      final joinedSnap = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('joined_uid_data')
+          .get();
+
+      if (mounted) {
+        setState(() {
+          _createdGroups = createdSnap.docs.length;
+          _joinedGroups = joinedSnap.docs.length;
+        });
       }
     } catch (e) {
       debugPrint('Profile load error: $e');
@@ -122,7 +93,6 @@ class _ProfilePageState extends State<ProfilePage>
     }
   }
 
-  // ── Helpers ────────────────────────────────────────────────────────────
   ImageProvider? get _avatar {
     final raw = _userData?['profile_image'];
     if (raw == null || raw.toString().isEmpty) return null;
@@ -135,6 +105,11 @@ class _ProfilePageState extends State<ProfilePage>
 
   String get _name => _userData?['Full_Name'] ?? 'Rider';
   String get _email => _userData?['Email'] ?? '';
+  String get _initials {
+    final parts = _name.trim().split(' ');
+    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    return _name.isNotEmpty ? _name[0].toUpperCase() : 'R';
+  }
 
   String get _joinDate {
     try {
@@ -149,17 +124,9 @@ class _ProfilePageState extends State<ProfilePage>
     }
   }
 
-  String _fmt(double v) =>
-      v >= 1000 ? '${(v / 1000).toStringAsFixed(1)}K' : v.toStringAsFixed(0);
-
   void _toggleTheme() => setState(() => _isDark = !_isDark);
+  Future<void> _signOut() async => await _auth.signOut();
 
-  Future<void> _signOut() async {
-    await _auth.signOut();
-    // Navigator.pushReplacement to your LoginPage if needed
-  }
-
-  // ── Root ───────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -170,12 +137,11 @@ class _ProfilePageState extends State<ProfilePage>
         child: Scaffold(
           backgroundColor: Colors.transparent,
           body: _isLoading
-              ? Center(child: CircularProgressIndicator(color: _accent))
+              ? Center(child: CircularProgressIndicator(color: _accent, strokeWidth: 2))
               : CustomScrollView(
             slivers: [
               SliverToBoxAdapter(child: _buildBanner()),
-              SliverToBoxAdapter(child: _buildIdentity()),
-              SliverToBoxAdapter(child: _buildStats()),
+              SliverToBoxAdapter(child: _buildGroupsCard()),
               SliverToBoxAdapter(child: _buildActions()),
               const SliverToBoxAdapter(child: SizedBox(height: 48)),
             ],
@@ -185,318 +151,272 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
-  // ── BANNER + AVATAR ────────────────────────────────────────────────────
   Widget _buildBanner() {
-    return SizedBox(
-      height: 260,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // Dark banner (same in both themes — feels intentional)
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 350),
-            height: 190,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: _isDark
-                    ? [const Color(0xFF1A1A2A), const Color(0xFF0D0D14)]
-                    : [const Color(0xFF111111), const Color(0xFF2A2A2A)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+    return FadeTransition(
+      opacity: _fade,
+      child: SizedBox(
+        height: 280,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // Banner
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 350),
+              height: 200,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF1A1A2E), Color(0xFF16213E)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
-            ),
-            child: Stack(
-              children: [
-                // Subtle glow
+              child: Stack(children: [
                 Positioned(
-                  top: -60,
-                  right: -60,
+                  top: -40, right: -40,
                   child: Container(
-                    width: 240,
-                    height: 240,
+                    width: 200, height: 200,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: RadialGradient(colors: [
-                        (_isDark
-                            ? const Color(0xFFCBFF3F)
-                            : Colors.white)
-                            .withOpacity(0.07),
+                        _accent.withOpacity(0.18),
                         Colors.transparent,
                       ]),
                     ),
                   ),
                 ),
-                // Brand
-                Positioned(
-                  top: 52,
-                  left: 22,
-                  child: Row(children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        color: _isDark
-                            ? const Color(0xFFCBFF3F)
-                            : Colors.white,
-                        shape: BoxShape.circle,
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(children: [
+                          Container(
+                            width: 8, height: 8,
+                            decoration: BoxDecoration(color: _accent, shape: BoxShape.circle),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('RIDESYNC', style: TextStyle(
+                            color: Colors.white, fontSize: 11,
+                            fontWeight: FontWeight.w800, letterSpacing: 3,
+                          )),
+                        ]),
+                        GestureDetector(
+                          onTap: _toggleTheme,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.white.withOpacity(0.12)),
+                            ),
+                            child: Icon(
+                              _isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                              color: Colors.white, size: 16,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_joinDate.isNotEmpty)
+                  Positioned(
+                    bottom: 16, left: 22,
+                    child: Text(_joinDate, style: TextStyle(
+                      color: Colors.white.withOpacity(0.35), fontSize: 12,
+                    )),
+                  ),
+              ]),
+            ),
+
+            // Curved bottom
+            Positioned(
+              bottom: 60, left: 0, right: 0,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 350),
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _bg,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                ),
+              ),
+            ),
+
+            // Avatar
+            Positioned(
+              top: 148, left: 0, right: 0,
+              child: Column(children: [
+                Stack(children: [
+                  Container(
+                    width: 90, height: 90,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: _accent, width: 2.5),
+                      boxShadow: [BoxShadow(
+                        color: _accent.withOpacity(0.3),
+                        blurRadius: 20,
+                      )],
+                    ),
+                    child: ClipOval(
+                      child: _avatar != null
+                          ? Image(image: _avatar!, fit: BoxFit.cover)
+                          : AnimatedContainer(
+                        duration: const Duration(milliseconds: 350),
+                        color: _isDark ? const Color(0xFF1E1E2C) : const Color(0xFFEEEEF6),
+                        child: Center(
+                          child: Text(_initials, style: TextStyle(
+                            color: _accent, fontSize: 28, fontWeight: FontWeight.w800,
+                          )),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 7),
-                    Text(
-                      'RIDESYNC',
-                      style: TextStyle(
-                        color: _isDark
-                            ? const Color(0xFFCBFF3F)
-                            : Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 3.5,
+                  ),
+                  Positioned(
+                    bottom: 3, right: 3,
+                    child: Container(
+                      width: 16, height: 16,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF22C55E),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _isDark ? const Color(0xFF0D0D12) : Colors.white,
+                          width: 2.5,
+                        ),
                       ),
+                    ),
+                  ),
+                ]),
+              ]),
+            ),
+
+            // Name + email + badge
+            Positioned(
+              bottom: 0, left: 0, right: 0,
+              child: SlideTransition(
+                position: _slide,
+                child: FadeTransition(
+                  opacity: _fade,
+                  child: Column(children: [
+                    Text(_name, style: TextStyle(
+                      color: _primary, fontSize: 22,
+                      fontWeight: FontWeight.w800, letterSpacing: -0.3,
+                    )),
+                    if (_email.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(_email, style: TextStyle(color: _secondary, fontSize: 13)),
+                    ],
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: _accentSubtle,
+                        borderRadius: BorderRadius.circular(20),
+                        border: _isDark ? Border.all(color: _accent.withOpacity(0.3)) : null,
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.electric_bolt_rounded, size: 11, color: _accent),
+                        const SizedBox(width: 5),
+                        Text('ACTIVE RIDER', style: TextStyle(
+                          color: _accent, fontSize: 10,
+                          fontWeight: FontWeight.w800, letterSpacing: 1.5,
+                        )),
+                      ]),
                     ),
                   ]),
                 ),
-                // Theme toggle
-                Positioned(
-                  top: 44,
-                  right: 16,
-                  child: GestureDetector(
-                    onTap: _toggleTheme,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      padding: const EdgeInsets.all(9),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: Colors.white.withOpacity(0.15)),
-                      ),
-                      child: Icon(
-                        _isDark
-                            ? Icons.light_mode_rounded
-                            : Icons.dark_mode_rounded,
-                        color: Colors.white,
-                        size: 17,
-                      ),
-                    ),
-                  ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── GROUPS CARD (replaces static stats row) ───────────────────────────
+  Widget _buildGroupsCard() {
+    final total = _createdGroups + _joinedGroups;
+
+    return SlideTransition(
+      position: _slide,
+      child: FadeTransition(
+        opacity: _fade,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 350),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: _surface,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: _border),
+              boxShadow: _isDark ? [] : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
-                // Join date
-                if (_joinDate.isNotEmpty)
-                  Positioned(
-                    bottom: 16,
-                    left: 22,
-                    child: Text(
-                      _joinDate,
-                      style: TextStyle(
-                          color: Colors.white.withOpacity(0.4),
-                          fontSize: 12),
-                    ),
-                  ),
               ],
             ),
-          ),
-
-          // Avatar — centered, overlapping banner bottom
-          Positioned(
-            top: 138,
-            left: 0,
-            right: 0,
-            child: FadeTransition(
-              opacity: _fade,
-              child: Center(
-                child: Stack(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 350),
-                      width: 96,
-                      height: 96,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: _isDark
-                              ? const Color(0xFFCBFF3F)
-                              : Colors.white,
-                          width: 3,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: (_isDark
-                                ? const Color(0xFFCBFF3F)
-                                : Colors.black)
-                                .withOpacity(_isDark ? 0.45 : 0.18),
-                            blurRadius: 22,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      ),
-                      child: ClipOval(
-                        child: _avatar != null
-                            ? Image(image: _avatar!, fit: BoxFit.cover)
-                            : AnimatedContainer(
-                          duration: const Duration(milliseconds: 350),
-                          color: _isDark
-                              ? const Color(0xFF1E1E2C)
-                              : const Color(0xFFE8E8EC),
-                          child: Icon(Icons.person_rounded,
-                              size: 40,
-                              color: _isDark
-                                  ? const Color(0xFF454560)
-                                  : const Color(0xFFB0B0B8)),
-                        ),
-                      ),
-                    ),
-                    // Online dot
-                    Positioned(
-                      bottom: 3,
-                      right: 3,
-                      child: Container(
-                        width: 15,
-                        height: 15,
+                    Row(children: [
+                      Container(
+                        width: 36, height: 36,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF34C759),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: _isDark
-                                ? const Color(0xFF0D0D12)
-                                : Colors.white,
-                            width: 2.5,
-                          ),
+                          color: _accent.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(11),
+                        ),
+                        child: Icon(Icons.group_rounded, color: _accent, size: 18),
+                      ),
+                      const SizedBox(width: 12),
+                      Text('My Groups', style: TextStyle(
+                        color: _primary, fontSize: 16, fontWeight: FontWeight.w700,
+                      )),
+                    ]),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: _accentSubtle,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '$total total',
+                        style: TextStyle(
+                          color: _accent, fontSize: 12, fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
                   ],
                 ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  // ── NAME + EMAIL + BADGE ───────────────────────────────────────────────
-  Widget _buildIdentity() {
-    return SlideTransition(
-      position: _slide,
-      child: FadeTransition(
-        opacity: _fade,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
-          child: Column(children: [
-            // Name — from Firestore Full_Name
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 300),
-              style: TextStyle(
-                color: _primary,
-                fontSize: 23,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.2,
-              ),
-              child: Text(_name, textAlign: TextAlign.center),
-            ),
-            const SizedBox(height: 5),
-            // Email — from Firestore Email
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 300),
-              style: TextStyle(color: _secondary, fontSize: 13),
-              child: Text(_email, textAlign: TextAlign.center),
-            ),
-            const SizedBox(height: 14),
-            // Badge
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 350),
-              padding:
-              const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
-              decoration: BoxDecoration(
-                color: _accentSubtle,
-                borderRadius: BorderRadius.circular(20),
-                border: _isDark
-                    ? Border.all(
-                    color: const Color(0xFFCBFF3F).withOpacity(0.35),
-                    width: 1)
-                    : null,
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.electric_bolt_rounded,
-                    size: 12, color: _accent),
-                const SizedBox(width: 5),
-                Text(
-                  'ACTIVE RIDER',
-                  style: TextStyle(
-                    color: _accent,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.6,
-                  ),
-                ),
-              ]),
-            ),
-          ]),
-        ),
-      ),
-    );
-  }
+                const SizedBox(height: 20),
 
-  // ── STATS ──────────────────────────────────────────────────────────────
-  Widget _buildStats() {
-    final items = [
-      {'label': 'RIDES', 'value': '$_totalRides'},
-      {'label': 'KM', 'value': _fmt(_totalKm)},
-      {'label': 'HOURS', 'value': _fmt(_totalHours)},
-    ];
-
-    return SlideTransition(
-      position: _slide,
-      child: FadeTransition(
-        opacity: _fade,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 26, 24, 0),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 350),
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            decoration: BoxDecoration(
-              color: _surface,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _border),
-              boxShadow: _isDark
-                  ? []
-                  : [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                )
-              ],
-            ),
-            child: Row(
-              children: [
-                for (int i = 0; i < items.length; i++) ...[
+                // Two counters
+                Row(children: [
                   Expanded(
-                    child: Column(children: [
-                      AnimatedDefaultTextStyle(
-                        duration: const Duration(milliseconds: 300),
-                        style: TextStyle(
-                          color: _primary,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                        ),
-                        child: Text(items[i]['value']!),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        items[i]['label']!,
-                        style: TextStyle(
-                          color: _secondary,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.4,
-                        ),
-                      ),
-                    ]),
+                    child: _groupCounter(
+                      label: 'Created',
+                      count: _createdGroups,
+                      icon: Icons.add_circle_outline_rounded,
+                      color: const Color(0xFF6C63FF),
+                    ),
                   ),
-                  if (i < items.length - 1)
-                    Container(width: 1, height: 34, color: _dividerColor),
-                ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _groupCounter(
+                      label: 'Joined',
+                      count: _joinedGroups,
+                      icon: Icons.login_rounded,
+                      color: const Color(0xFF22C55E),
+                    ),
+                  ),
+                ]),
               ],
             ),
           ),
@@ -505,41 +425,111 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
-  // ── ACTION TILES ───────────────────────────────────────────────────────
+  Widget _groupCounter({
+    required String label,
+    required int count,
+    required IconData icon,
+    required Color color,
+  }) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 350),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.15)),
+      ),
+      child: Row(children: [
+        Container(
+          width: 36, height: 36,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: color, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$count',
+              style: TextStyle(
+                color: _primary, fontSize: 22,
+                fontWeight: FontWeight.w800, letterSpacing: -0.5,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                color: _secondary, fontSize: 11, fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ]),
+    );
+  }
+
   Widget _buildActions() {
     return SlideTransition(
       position: _slide,
       child: FadeTransition(
         opacity: _fade,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _tile(
-                icon: Icons.person_outline_rounded,
-                label: 'Edit Profile',
-                onTap: () {
-                  // TODO: navigate to edit profile page
-                },
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 12),
+                child: Text('ACCOUNT', style: TextStyle(
+                  color: _secondary, fontSize: 10,
+                  fontWeight: FontWeight.w700, letterSpacing: 2,
+                )),
               ),
-              _tile(
-                icon: Icons.route_rounded,
-                label: 'My Rides',
-                badge: _totalRides > 0 ? '$_totalRides' : null,
-                onTap: () {
-                  // TODO: navigate to rides page
-                },
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 350),
+                decoration: BoxDecoration(
+                  color: _surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: _border),
+                  boxShadow: _isDark ? [] : [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 12, offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(children: [
+                  _tile(
+                    icon: Icons.person_outline_rounded,
+                    label: 'Edit Profile',
+                    iconColor: const Color(0xFF6C63FF),
+                    onTap: () async {
+                      final updatedName = await Navigator.push<String>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EditProfilePage(currentName: _name),
+                        ),
+                      );
+                      if (updatedName != null && mounted) {
+                        setState(() => _userData?['Full_Name'] = updatedName);
+                      }
+                    },
+                    isFirst: true,
+                  ),
+                  Divider(height: 1, indent: 68, color: _border),
+                  _tile(
+                    icon: _isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+                    label: _isDark ? 'Light Mode' : 'Dark Mode',
+                    iconColor: const Color(0xFFF59E0B),
+                    onTap: _toggleTheme,
+                    isLast: true,
+                  ),
+                ]),
               ),
-              _tile(
-                icon: _isDark
-                    ? Icons.light_mode_outlined
-                    : Icons.dark_mode_outlined,
-                label: _isDark ? 'Switch to Light' : 'Switch to Dark',
-                onTap: _toggleTheme,
-              ),
-              const SizedBox(height: 8),
-              // Sign out — destructive
+              const SizedBox(height: 14),
               GestureDetector(
                 onTap: _signOut,
                 child: AnimatedContainer(
@@ -547,25 +537,19 @@ class _ProfilePageState extends State<ProfilePage>
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.06),
-                    borderRadius: BorderRadius.circular(16),
-                    border:
-                    Border.all(color: Colors.red.withOpacity(0.2)),
+                    color: const Color(0xFFEF4444).withOpacity(0.07),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.2)),
                   ),
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.logout_rounded,
-                          color: Colors.redAccent, size: 17),
+                      Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 16),
                       SizedBox(width: 8),
-                      Text(
-                        'Sign Out',
-                        style: TextStyle(
-                          color: Colors.redAccent,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
-                      ),
+                      Text('Sign Out', style: TextStyle(
+                        color: Color(0xFFEF4444),
+                        fontWeight: FontWeight.w700, fontSize: 15,
+                      )),
                     ],
                   ),
                 ),
@@ -580,72 +564,40 @@ class _ProfilePageState extends State<ProfilePage>
   Widget _tile({
     required IconData icon,
     required String label,
+    required Color iconColor,
     required VoidCallback onTap,
-    String? badge,
+    bool isFirst = false,
+    bool isLast = false,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 350),
-        margin: const EdgeInsets.only(bottom: 10),
-        padding:
-        const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: _surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _border),
-          boxShadow: _isDark
-              ? []
-              : [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            )
-          ],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.vertical(
+          top: isFirst ? const Radius.circular(20) : Radius.zero,
+          bottom: isLast ? const Radius.circular(20) : Radius.zero,
         ),
-        child: Row(children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 350),
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-                color: _iconBg, borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, color: _accent, size: 17),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 300),
-              style: TextStyle(
-                  color: _primary,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500),
-              child: Text(label),
-            ),
-          ),
-          if (badge != null) ...[
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 350),
-              padding:
-              const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(children: [
+            Container(
+              width: 38, height: 38,
               decoration: BoxDecoration(
-                color: _accentSubtle,
-                borderRadius: BorderRadius.circular(8),
+                color: iconColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(11),
               ),
-              child: Text(
-                badge,
-                style: TextStyle(
-                    color: _accent,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700),
-              ),
+              child: Icon(icon, color: iconColor, size: 18),
             ),
-            const SizedBox(width: 8),
-          ],
-          Icon(Icons.chevron_right_rounded,
-              color: _chevronColor, size: 20),
-        ]),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(label, style: TextStyle(
+                color: _primary, fontSize: 15, fontWeight: FontWeight.w500,
+              )),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                color: _secondary.withOpacity(0.5), size: 20),
+          ]),
+        ),
       ),
     );
   }

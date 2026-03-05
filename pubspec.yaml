@@ -40,8 +40,11 @@ dependencies:
   image_picker: ^1.1.2          # must be 1.x, not 0.x
   cloud_firestore: ^4.17.0
   firebase_core: ^2.32.0
-  fluttertoast: ^8.2.4
 
+
+  flutter_map: ^8.2.2
+  location: ^7.0.0
+  latlong2: ^0.9.1
 
 
 dev_dependencies:
