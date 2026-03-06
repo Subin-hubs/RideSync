@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
 import 'package:ride_sync/Screens/Creat_Page/button_sheets.dart';
 
-import 'Chat_Page/chat_page.dart';
+import 'Chat_Page/ChatGroupPickerPage.dart';
 import 'Creat_Page/create_page.dart';
 import 'Home_Page/home_page.dart';
 import 'Notificatation_Page/notificatation_page.dart';
 import 'Profile_Page/profile_page.dart';
-
-
 
 class NavbarSide extends StatefulWidget {
   final int currentIndex;
@@ -22,9 +20,11 @@ class NavbarSide extends StatefulWidget {
 class _NavbarSideState extends State<NavbarSide> {
   late PersistentTabController _controller;
 
-  final List<Widget> _pages =  [
+  // ChatPage is never placed here — it's pushed via Navigator.of(context, rootNavigator: true)
+  // so it renders completely above the navbar with no bottom bar visible
+  final List<Widget> _pages = [
     HomePage(),
-    ChatPage(),
+    ChatGroupPickerPage(),
     CreatePage(),
     NotificatationPage(),
     ProfilePage(),
@@ -35,7 +35,6 @@ class _NavbarSideState extends State<NavbarSide> {
     super.initState();
     _controller = PersistentTabController(initialIndex: widget.currentIndex);
   }
-
 
   List<PersistentBottomNavBarItem> _navBarsItems() {
     return [
@@ -52,17 +51,14 @@ class _NavbarSideState extends State<NavbarSide> {
         inactiveColorPrimary: Colors.grey,
       ),
       PersistentBottomNavBarItem(
-        icon: const Icon(
-          Icons.add,
-          color: Colors.white,
-        ),
+        icon: const Icon(Icons.add, color: Colors.white),
         title: "Create",
         activeColorPrimary: Colors.blueAccent,
         inactiveColorPrimary: Colors.blueAccent,
         iconSize: 35,
-          onPressed: (context) {
-            showProfessionalBottomSheet(this.context);
-          }
+        onPressed: (context) {
+          showProfessionalBottomSheet(context!);
+        },
       ),
       PersistentBottomNavBarItem(
         icon: const Icon(Icons.notifications_none),
@@ -95,8 +91,7 @@ class _NavbarSideState extends State<NavbarSide> {
         borderRadius: BorderRadius.circular(0.0),
         colorBehindNavBar: Colors.white,
       ),
-      navBarStyle:
-      NavBarStyle.style15, // <- This uses the fancy middle item style
+      navBarStyle: NavBarStyle.style15,
     );
   }
 }

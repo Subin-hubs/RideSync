@@ -61,6 +61,8 @@ class _CreatePageState extends State<CreatePage> {
       "createdBy": userUid,
       "member_count": 1, // Creator is first member
       "createdAt": FieldValue.serverTimestamp(),
+      "chatEnabled": true,       
+      "locationEnabled": true,
     });
 
     // Add creator to joined_users subcollection

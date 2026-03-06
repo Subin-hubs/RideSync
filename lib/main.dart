@@ -5,10 +5,20 @@ import 'package:flutter/material.dart';
 
 import 'Auth/login_page.dart';
 import 'Screens/navbar.dart';
+import 'Services/location_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+
+  // Start location sharing if user is already logged in (e.g. app restart)
+  FirebaseAuth.instance.authStateChanges().listen((user) {
+    if (user != null) {
+      LocationService().startSharing(intervalSeconds: 5);
+    } else {
+      LocationService().stopSharing();
+    }
+  });
 
   runApp(const MyApp());
 }

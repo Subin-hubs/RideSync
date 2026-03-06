@@ -94,7 +94,6 @@ class _HomePageState extends State<HomePage> {
                       letterSpacing: 0.3,
                     ),
                   ),
-                  // ✅ Rebuilds when _userData loads
                   Text(
                     _userData == null ? 'Rider' : _name,
                     style: const TextStyle(
@@ -111,7 +110,6 @@ class _HomePageState extends State<HomePage> {
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: 16),
-              // ✅ Profile avatar replaces notification icon
               child: Container(
                 width: 38,
                 height: 38,

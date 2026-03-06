@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-/// ---------------------- TOAST FUNCTION ----------------------
+/// Simple overlay toast notification
 void showAppToast(BuildContext context, String msg) {
   final overlay = Overlay.of(context);
   final entry = OverlayEntry(
@@ -26,10 +26,7 @@ void showAppToast(BuildContext context, String msg) {
   );
 
   overlay.insert(entry);
-
-  Future.delayed(const Duration(seconds: 2)).then((_) {
-    entry.remove();
-  });
+  Future.delayed(const Duration(seconds: 2)).then((_) => entry.remove());
 }
 
 /// ---------------------- MAIN PAGE ----------------------
@@ -45,7 +42,7 @@ class _JoinedPageState extends State<JoinedPage> {
   bool isLoading = false;
 
   Future<void> joinGroup() async {
-    String code = codeController.text.trim();
+    final code = codeController.text.trim().toUpperCase();
 
     if (code.length != 6) {
       showAppToast(context, "Enter a valid 6-character code");
@@ -55,10 +52,11 @@ class _JoinedPageState extends State<JoinedPage> {
     setState(() => isLoading = true);
 
     try {
-      String uid = FirebaseAuth.instance.currentUser!.uid;
+      final currentUser = FirebaseAuth.instance.currentUser!;
+      final uid = currentUser.uid;
 
-      /// 1️⃣ Find group using joinCode (NOT doc(code))
-      QuerySnapshot query = await FirebaseFirestore.instance
+      /// 1️⃣ Find group by joinCode
+      final query = await FirebaseFirestore.instance
           .collection("groups")
           .where("joinCode", isEqualTo: code)
           .limit(1)
@@ -70,19 +68,14 @@ class _JoinedPageState extends State<JoinedPage> {
         return;
       }
 
-      /// Found the group
-      DocumentSnapshot groupDoc = query.docs.first;
-      String groupId = groupDoc.id;
-
-      DocumentReference groupRef = FirebaseFirestore.instance
-          .collection("groups")
-          .doc(groupId);
+      final groupDoc = query.docs.first;
+      final groupId = groupDoc.id;
+      final groupRef =
+      FirebaseFirestore.instance.collection("groups").doc(groupId);
 
       /// 2️⃣ Check if already joined
-      DocumentSnapshot joinedDoc = await groupRef
-          .collection("joined_users")
-          .doc(uid)
-          .get();
+      final joinedDoc =
+      await groupRef.collection("joined_users").doc(uid).get();
 
       if (joinedDoc.exists) {
         showAppToast(context, "You already joined this group!");
@@ -90,13 +83,14 @@ class _JoinedPageState extends State<JoinedPage> {
         return;
       }
 
-      /// 3️⃣ Save under groups/{groupId}/joined_users/{uid}
+      /// 3️⃣ Add user to groups/{groupId}/joined_users/{uid}
       await groupRef.collection("joined_users").doc(uid).set({
         "uid": uid,
+        "displayName": currentUser.displayName ?? "Rider",
         "joined_at": FieldValue.serverTimestamp(),
       });
 
-      /// 4️⃣ Save under users/{uid}/joined/{groupId}
+      /// 4️⃣ Save group reference under users/{uid}/joined/{groupId}
       await FirebaseFirestore.instance
           .collection("users")
           .doc(uid)
@@ -109,13 +103,21 @@ class _JoinedPageState extends State<JoinedPage> {
         "joined_at": FieldValue.serverTimestamp(),
       });
 
-      /// 5️⃣ Increment memberCount (optional)
+      /// 5️⃣ Increment group member count
       await groupRef.update({
         "member_count": FieldValue.increment(1),
       });
 
-      showAppToast(context, "Successfully joined!");
+      /// 6️⃣ Post a system welcome message so the user is visible in chat
+      await groupRef.collection("messages").add({
+        "senderId": "system",
+        "senderName": "RideSync",
+        "text":
+        "${currentUser.displayName ?? 'A new rider'} joined the group 🏍️",
+        "timestamp": FieldValue.serverTimestamp(),
+      });
 
+      showAppToast(context, "Successfully joined!");
       Navigator.pop(context);
     } catch (e) {
       showAppToast(context, "Error: ${e.toString()}");
@@ -123,10 +125,11 @@ class _JoinedPageState extends State<JoinedPage> {
       setState(() => isLoading = false);
     }
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xfff4f5fa),
+      backgroundColor: const Color(0xFFF4F5FA),
       appBar: AppBar(
         title: const Text("Join Group"),
         backgroundColor: Colors.white,
@@ -139,7 +142,7 @@ class _JoinedPageState extends State<JoinedPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // CARD 1
+              // Code entry card
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -149,9 +152,11 @@ class _JoinedPageState extends State<JoinedPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("Enter Group Code",
-                        style: TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.w600)),
+                    const Text(
+                      "Enter Group Code",
+                      style: TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.w600),
+                    ),
                     const SizedBox(height: 5),
                     const Text(
                       "Ask your group admin for the 6-character code",
@@ -163,9 +168,16 @@ class _JoinedPageState extends State<JoinedPage> {
                       controller: codeController,
                       maxLength: 6,
                       textAlign: TextAlign.center,
+                      textCapitalization: TextCapitalization.characters,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 6,
+                      ),
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: Colors.grey.shade200,
+                        counterText: "", // hide the "0/6" counter
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
@@ -173,26 +185,34 @@ class _JoinedPageState extends State<JoinedPage> {
                       ),
                     ),
 
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 14),
 
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: isLoading ? null : joinGroup,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueAccent,
+                          backgroundColor: const Color(0xFF6C63FF),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
                         child: isLoading
-                            ? const CircularProgressIndicator(
-                            color: Colors.white)
+                            ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
                             : const Text(
                           "Join Group",
                           style: TextStyle(
-                              fontSize: 16, color: Colors.white),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white),
                         ),
                       ),
                     ),
@@ -202,24 +222,30 @@ class _JoinedPageState extends State<JoinedPage> {
 
               const SizedBox(height: 20),
 
-              // CARD 2
+              // How it works card
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(15),
                 ),
-                child: Column(
+                child: const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text("How it works",
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.w600)),
+                  children: [
+                    Text(
+                      "How it works",
+                      style: TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w600),
+                    ),
                     SizedBox(height: 15),
-                    _StepTile(num: 1, text: "Get the group code from your admin"),
+                    _StepTile(
+                        num: 1,
+                        text: "Get the group code from your admin"),
                     _StepTile(num: 2, text: "Enter the code above"),
-                    _StepTile(num: 3, text: "Start sharing your location"),
-                    _StepTile(num: 4, text: "Chat with group members"),
+                    _StepTile(
+                        num: 3, text: "Start sharing your location"),
+                    _StepTile(
+                        num: 4, text: "Chat with group members"),
                   ],
                 ),
               ),
@@ -231,6 +257,7 @@ class _JoinedPageState extends State<JoinedPage> {
   }
 }
 
+/// Numbered step row
 class _StepTile extends StatelessWidget {
   final int num;
   final String text;
@@ -239,24 +266,27 @@ class _StepTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 13,
-          backgroundColor: Colors.blueAccent,
-          child: Text(
-            "$num",
-            style: const TextStyle(color: Colors.white, fontSize: 14),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 13,
+            backgroundColor: const Color(0xFF6C63FF),
+            child: Text(
+              "$num",
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+            ),
           ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(fontSize: 15, color: Colors.black87),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 15, color: Colors.black87),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
