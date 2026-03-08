@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:ride_sync/welcome_Page.dart';
 
 import 'Auth/login_page.dart';
 import 'Screens/navbar.dart';
@@ -43,7 +44,7 @@ class MyApp extends StatelessWidget {
 
           // No user logged in
           if (!snapshot.hasData) {
-            return const LoginPage();
+            return const WelcomePage();
           }
 
           // User is logged in, check Firestore
@@ -66,7 +67,7 @@ class MyApp extends StatelessWidget {
 
               // Firestore document missing → log out user
               FirebaseAuth.instance.signOut();
-              return const LoginPage();
+              return const WelcomePage();
             },
           );
         },

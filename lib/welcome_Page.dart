@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:ride_sync/Auth/login_page.dart';
+import 'package:ride_sync/Auth/signup_page.dart';
 
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
@@ -17,20 +19,22 @@ class WelcomePage extends StatelessWidget {
 
               /// App Icon
               Container(
-                height: 90,
-                width: 90,
+                height: 150,
+                width: 150,
                 decoration: BoxDecoration(
+                  shape: BoxShape.circle,
                   gradient: const LinearGradient(
                     colors: [Color(0xff3A7BFF), Color(0xff5A54E3)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(25),
                 ),
-                child: const Icon(
-                  Icons.location_on_outlined,
-                  color: Colors.white,
-                  size: 40,
+                padding: const EdgeInsets.all(6),
+                child: ClipOval(
+                  child: Image.asset(
+                    "assests/splash_logo.png", // your logo path
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
 
@@ -101,7 +105,10 @@ class WelcomePage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const LoginPage()));
+                  },
                   child: const Text(
                     "Log In",
                     style: TextStyle(fontSize: 18),
@@ -123,7 +130,10 @@ class WelcomePage extends StatelessWidget {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const SignupPage()));
+                  },
                   child: const Text(
                     "Sign Up",
                     style: TextStyle(fontSize: 18),
